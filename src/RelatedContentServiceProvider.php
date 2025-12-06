@@ -6,7 +6,6 @@ namespace Vlados\LaravelRelatedContent;
 
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use Vlados\LaravelRelatedContent\Commands\GenerateEmbeddingsCommand;
 use Vlados\LaravelRelatedContent\Commands\RebuildRelatedContentCommand;
 use Vlados\LaravelRelatedContent\Contracts\EmbeddingProvider;
 use Vlados\LaravelRelatedContent\Handlers\OllamaHandler;
@@ -26,7 +25,6 @@ class RelatedContentServiceProvider extends PackageServiceProvider
                 'create_related_content_table',
             ])
             ->hasCommands([
-                GenerateEmbeddingsCommand::class,
                 RebuildRelatedContentCommand::class,
             ]);
     }

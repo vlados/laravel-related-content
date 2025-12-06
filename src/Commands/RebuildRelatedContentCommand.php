@@ -11,16 +11,18 @@ use Vlados\LaravelRelatedContent\Services\RelatedContentService;
 class RebuildRelatedContentCommand extends Command
 {
     protected $signature = 'related-content:rebuild
-                            {model? : The model class to rebuild (optional, rebuilds all if not specified)}
+                            {model? : The model class to rebuild (optional, rebuilds all configured models if not specified)}
+                            {--force : Process all models, even those with existing embeddings}
                             {--sync : Process synchronously instead of queuing}
                             {--chunk=100 : Number of models to process per chunk}';
 
-    protected $description = 'Rebuild related content links for models';
+    protected $description = 'Rebuild related content links for models (only missing by default, use --force for all)';
 
     public function handle(RelatedContentService $service): int
     {
         $modelClass = $this->argument('model');
-        $sync = $this->option('sync');
+        $force = (bool) $this->option('force');
+        $sync = (bool) $this->option('sync');
         $chunkSize = (int) $this->option('chunk');
 
         $modelTypes = $modelClass
@@ -33,6 +35,10 @@ class RebuildRelatedContentCommand extends Command
             return self::FAILURE;
         }
 
+        $modeText = $force ? 'force' : 'missing only';
+        $this->info("Rebuilding related content ({$modeText})...");
+        $this->newLine();
+
         foreach ($modelTypes as $modelClass) {
             if (! class_exists($modelClass)) {
                 $this->warn("Model class {$modelClass} does not exist, skipping.");
@@ -40,35 +46,66 @@ class RebuildRelatedContentCommand extends Command
                 continue;
             }
 
-            $this->info("Rebuilding related content for {$modelClass}...");
+            if (! method_exists($modelClass, 'embeddableFields')) {
+                $this->warn("Model {$modelClass} does not use HasRelatedContent trait, skipping.");
 
-            $query = $modelClass::query();
-            $total = $query->count();
-            $processed = 0;
+                continue;
+            }
 
-            $bar = $this->output->createProgressBar($total);
-            $bar->start();
-
-            $query->chunkById($chunkSize, function ($models) use ($service, $sync, &$processed, $bar) {
-                foreach ($models as $model) {
-                    if ($sync) {
-                        $service->sync($model);
-                    } else {
-                        SyncRelatedContentJob::dispatch($model);
-                    }
-
-                    $processed++;
-                    $bar->advance();
-                }
-            });
-
-            $bar->finish();
-            $this->newLine(2);
-
-            $method = $sync ? 'processed' : 'queued';
-            $this->info("{$processed} models {$method} for {$modelClass}");
+            $this->processModel($service, $modelClass, $chunkSize, $force, $sync);
+            $this->newLine();
         }
 
         return self::SUCCESS;
+    }
+
+    protected function processModel(
+        RelatedContentService $service,
+        string $modelClass,
+        int $chunkSize,
+        bool $force,
+        bool $sync
+    ): void {
+        $query = $modelClass::query();
+
+        // Only process models without embeddings unless --force is used
+        if (! $force) {
+            $query->whereDoesntHave('embedding');
+        }
+
+        $total = $query->count();
+
+        if ($total === 0) {
+            $this->info("No " . ($force ? '' : 'missing ') . "models to process for {$modelClass}.");
+
+            return;
+        }
+
+        $this->info("Processing {$modelClass}" . ($force ? '' : ' (missing only)') . "...");
+        $this->info("Found {$total} models to process.");
+
+        $processed = 0;
+
+        $bar = $this->output->createProgressBar($total);
+        $bar->start();
+
+        $query->chunkById($chunkSize, function ($models) use ($service, $sync, &$processed, $bar) {
+            foreach ($models as $model) {
+                if ($sync) {
+                    $service->sync($model);
+                } else {
+                    SyncRelatedContentJob::dispatch($model);
+                }
+
+                $processed++;
+                $bar->advance();
+            }
+        });
+
+        $bar->finish();
+        $this->newLine(2);
+
+        $method = $sync ? 'processed' : 'queued';
+        $this->info("{$processed} models {$method} for {$modelClass}");
     }
 }

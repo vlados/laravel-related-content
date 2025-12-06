@@ -1,17 +1,16 @@
 <?php
 
-use Pgvector\Laravel\Vector;
-use Vlados\LaravelRelatedContent\Contracts\EmbeddingProvider;
+use Illuminate\Support\Facades\Queue;
 use Vlados\LaravelRelatedContent\Models\Embedding;
-use Vlados\LaravelRelatedContent\Services\EmbeddingService;
+use Vlados\LaravelRelatedContent\Services\RelatedContentService;
 use Vlados\LaravelRelatedContent\Tests\Fixtures\TestPost;
 
 beforeEach(function () {
     config()->set('related-content.models', [TestPost::class]);
 });
 
-describe('GenerateEmbeddingsCommand', function () {
-    it('generates embeddings only for models without embeddings by default', function () {
+describe('RebuildRelatedContentCommand', function () {
+    it('processes only models without embeddings by default', function () {
         $post1 = createTestPost(['title' => 'First Post']);
         $post2 = createTestPost(['title' => 'Second Post']);
 
@@ -24,53 +23,66 @@ describe('GenerateEmbeddingsCommand', function () {
             'dimensions' => 10,
         ]);
 
-        $mockProvider = Mockery::mock(EmbeddingProvider::class);
-        $mockProvider->shouldReceive('generate')
-            ->once() // Only called once for post2
-            ->andReturn(new Vector(generateFakeEmbedding(10)));
-        $mockProvider->shouldReceive('model')
-            ->andReturn('text-embedding-3-small');
-        $mockProvider->shouldReceive('dimensions')
-            ->andReturn(10);
+        // Mock the service to track which models get synced
+        $syncedModels = [];
+        $mockService = Mockery::mock(RelatedContentService::class);
+        $mockService->shouldReceive('sync')
+            ->andReturnUsing(function ($model) use (&$syncedModels) {
+                $syncedModels[] = $model->id;
+            });
 
-        $this->app->instance(EmbeddingProvider::class, $mockProvider);
+        $this->app->instance(RelatedContentService::class, $mockService);
 
-        $this->artisan('related-content:embeddings', [
+        $this->artisan('related-content:rebuild', [
             'model' => TestPost::class,
+            '--sync' => true,
         ])
             ->expectsOutputToContain('missing only')
-            ->expectsOutputToContain('Processed: 1')
+            ->expectsOutputToContain('1 models processed')
             ->assertExitCode(0);
 
-        expect(Embedding::count())->toBe(2);
+        // Only post2 should be synced (post1 already has embedding)
+        expect($syncedModels)->toBe([$post2->id]);
     });
 
-    it('regenerates all embeddings with --force flag', function () {
+    it('processes all models with --force flag', function () {
         $post1 = createTestPost(['title' => 'First Post']);
         $post2 = createTestPost(['title' => 'Second Post']);
 
-        $mockProvider = Mockery::mock(EmbeddingProvider::class);
-        $mockProvider->shouldReceive('generate')
-            ->andReturn(new Vector(generateFakeEmbedding(10)));
-        $mockProvider->shouldReceive('model')
-            ->andReturn('text-embedding-3-small');
-        $mockProvider->shouldReceive('dimensions')
-            ->andReturn(10);
+        // Create embedding for post1 (simulating it already has one)
+        Embedding::create([
+            'embeddable_type' => TestPost::class,
+            'embeddable_id' => $post1->id,
+            'embedding' => json_encode(generateFakeEmbedding(10)),
+            'model' => 'test',
+            'dimensions' => 10,
+        ]);
 
-        $this->app->instance(EmbeddingProvider::class, $mockProvider);
+        // Mock the service to track which models get synced
+        $syncedModels = [];
+        $mockService = Mockery::mock(RelatedContentService::class);
+        $mockService->shouldReceive('sync')
+            ->andReturnUsing(function ($model) use (&$syncedModels) {
+                $syncedModels[] = $model->id;
+            });
 
-        $this->artisan('related-content:embeddings', [
+        $this->app->instance(RelatedContentService::class, $mockService);
+
+        $this->artisan('related-content:rebuild', [
             'model' => TestPost::class,
             '--force' => true,
+            '--sync' => true,
         ])
             ->expectsOutputToContain('force')
-            ->expectsOutputToContain('Processed: 2')
+            ->expectsOutputToContain('2 models processed')
             ->assertExitCode(0);
 
-        expect(Embedding::count())->toBe(2);
+        // Both posts should be synced with --force
+        expect($syncedModels)->toContain($post1->id)
+            ->and($syncedModels)->toContain($post2->id);
     });
 
-    it('shows message when no missing embeddings', function () {
+    it('shows message when no missing models to process', function () {
         $post = createTestPost(['title' => 'Test Post']);
 
         // Create embedding for the post
@@ -82,136 +94,11 @@ describe('GenerateEmbeddingsCommand', function () {
             'dimensions' => 10,
         ]);
 
-        $this->artisan('related-content:embeddings', [
-            'model' => TestPost::class,
-        ])
-            ->expectsOutputToContain('No missing embeddings')
-            ->assertExitCode(0);
-    });
-
-    it('fails when model class does not exist', function () {
-        $this->artisan('related-content:embeddings', [
-            'model' => 'App\\Models\\NonExistent',
-        ])
-            ->expectsOutput('Model class App\\Models\\NonExistent does not exist.')
-            ->assertExitCode(1);
-    });
-
-    it('fails when model does not use HasRelatedContent trait', function () {
-        $this->artisan('related-content:embeddings', [
-            'model' => \Illuminate\Database\Eloquent\Model::class,
-        ])
-            ->expectsOutputToContain('must use the HasRelatedContent trait')
-            ->assertExitCode(1);
-    });
-
-    it('respects chunk size option', function () {
-        for ($i = 0; $i < 5; $i++) {
-            createTestPost(['title' => "Post {$i}"]);
-        }
-
-        $mockProvider = Mockery::mock(EmbeddingProvider::class);
-        $mockProvider->shouldReceive('generate')
-            ->andReturn(new Vector(generateFakeEmbedding(10)));
-        $mockProvider->shouldReceive('model')
-            ->andReturn('text-embedding-3-small');
-        $mockProvider->shouldReceive('dimensions')
-            ->andReturn(10);
-
-        $this->app->instance(EmbeddingProvider::class, $mockProvider);
-
-        $this->artisan('related-content:embeddings', [
-            'model' => TestPost::class,
-            '--force' => true,
-            '--chunk' => 2,
-        ])->assertExitCode(0);
-
-        expect(Embedding::count())->toBe(5);
-    });
-
-    it('processes all configured models when no model specified', function () {
-        $post1 = createTestPost(['title' => 'First Post']);
-        $post2 = createTestPost(['title' => 'Second Post']);
-
-        $mockProvider = Mockery::mock(EmbeddingProvider::class);
-        $mockProvider->shouldReceive('generate')
-            ->andReturn(new Vector(generateFakeEmbedding(10)));
-        $mockProvider->shouldReceive('model')
-            ->andReturn('text-embedding-3-small');
-        $mockProvider->shouldReceive('dimensions')
-            ->andReturn(10);
-
-        $this->app->instance(EmbeddingProvider::class, $mockProvider);
-
-        $this->artisan('related-content:embeddings', ['--force' => true])
-            ->expectsOutputToContain('Processing all configured models')
-            ->expectsOutputToContain('Generating embeddings for')
-            ->assertExitCode(0);
-
-        expect(Embedding::count())->toBe(2);
-    });
-
-    it('fails when no model specified and no models configured', function () {
-        config()->set('related-content.models', []);
-
-        $this->artisan('related-content:embeddings')
-            ->expectsOutput('No models configured. Either specify a model or configure related-content.models.')
-            ->assertExitCode(1);
-    });
-
-    it('skips invalid models when processing all', function () {
-        config()->set('related-content.models', [
-            'App\\Models\\NonExistent',
-            TestPost::class,
-        ]);
-
-        createTestPost(['title' => 'Test Post']);
-
-        $mockProvider = Mockery::mock(EmbeddingProvider::class);
-        $mockProvider->shouldReceive('generate')
-            ->andReturn(new Vector(generateFakeEmbedding(10)));
-        $mockProvider->shouldReceive('model')
-            ->andReturn('text-embedding-3-small');
-        $mockProvider->shouldReceive('dimensions')
-            ->andReturn(10);
-
-        $this->app->instance(EmbeddingProvider::class, $mockProvider);
-
-        $this->artisan('related-content:embeddings', ['--force' => true])
-            ->expectsOutputToContain('does not exist, skipping')
-            ->expectsOutputToContain('Processed: 1')
-            ->assertExitCode(0);
-    });
-});
-
-describe('RebuildRelatedContentCommand', function () {
-    it('rebuilds related content for specified model with sync flag', function () {
-        $post1 = createTestPost(['title' => 'First Post']);
-        $post2 = createTestPost(['title' => 'Second Post']);
-
-        // Create mock that will be used
-        $mockProvider = Mockery::mock(EmbeddingProvider::class);
-        $mockProvider->shouldReceive('generate')
-            ->andReturn(new Vector(generateFakeEmbedding(10)));
-        $mockProvider->shouldReceive('model')
-            ->andReturn('text-embedding-3-small');
-        $mockProvider->shouldReceive('dimensions')
-            ->andReturn(10);
-
-        $this->app->instance(EmbeddingProvider::class, $mockProvider);
-
-        // Mock the service to avoid pgvector operations
-        $mockEmbeddingService = Mockery::mock(EmbeddingService::class);
-        $mockEmbeddingService->shouldReceive('embedModel')
-            ->andReturn(null); // Return null to skip findSimilar
-
-        $this->app->instance(EmbeddingService::class, $mockEmbeddingService);
-
         $this->artisan('related-content:rebuild', [
             'model' => TestPost::class,
             '--sync' => true,
         ])
-            ->expectsOutputToContain('Rebuilding related content for')
+            ->expectsOutputToContain('No missing models to process')
             ->assertExitCode(0);
     });
 
@@ -235,15 +122,55 @@ describe('RebuildRelatedContentCommand', function () {
             ->assertExitCode(0);
     });
 
-    it('processes queued jobs when sync flag is not set', function () {
+    it('skips models without HasRelatedContent trait', function () {
+        config()->set('related-content.models', [
+            \Illuminate\Database\Eloquent\Model::class,
+        ]);
+
+        $this->artisan('related-content:rebuild', [
+            '--sync' => true,
+        ])
+            ->expectsOutputToContain('does not use HasRelatedContent trait, skipping')
+            ->assertExitCode(0);
+    });
+
+    it('queues jobs when sync flag is not set', function () {
         Queue::fake();
 
         createTestPost(['title' => 'Test Post']);
 
         $this->artisan('related-content:rebuild', [
             'model' => TestPost::class,
+            '--force' => true,
         ])
             ->expectsOutputToContain('queued')
             ->assertExitCode(0);
+    });
+
+    it('processes all configured models when no model specified', function () {
+        $post1 = createTestPost(['title' => 'First Post']);
+        $post2 = createTestPost(['title' => 'Second Post']);
+
+        // Mock the service to track which models get synced
+        $syncedModels = [];
+        $mockService = Mockery::mock(RelatedContentService::class);
+        $mockService->shouldReceive('sync')
+            ->andReturnUsing(function ($model) use (&$syncedModels) {
+                $syncedModels[] = $model->id;
+            });
+
+        $this->app->instance(RelatedContentService::class, $mockService);
+
+        $this->artisan('related-content:rebuild', [
+            '--force' => true,
+            '--sync' => true,
+        ])
+            ->expectsOutputToContain('Rebuilding related content')
+            ->expectsOutputToContain('2 models processed')
+            ->assertExitCode(0);
+
+        // Both posts should be synced
+        expect($syncedModels)->toContain($post1->id)
+            ->and($syncedModels)->toContain($post2->id);
     });
 });

@@ -76,12 +76,12 @@ class RebuildRelatedContentCommand extends Command
         $total = $query->count();
 
         if ($total === 0) {
-            $this->info("No " . ($force ? '' : 'missing ') . "models to process for {$modelClass}.");
+            $this->info('No '.($force ? '' : 'missing ')."models to process for {$modelClass}.");
 
             return;
         }
 
-        $this->info("Processing {$modelClass}" . ($force ? '' : ' (missing only)') . "...");
+        $this->info("Processing {$modelClass}".($force ? '' : ' (missing only)').'...');
         $this->info("Found {$total} models to process.");
 
         $processed = 0;

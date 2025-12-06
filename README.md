@@ -15,7 +15,7 @@ Build related content links using vector embeddings and pgvector for Laravel.
 
 ## Requirements
 
-- PHP 8.2+
+- PHP 8.3+
 - Laravel 11 or 12
 - PostgreSQL with pgvector extension
 
@@ -239,6 +239,16 @@ class HandleRelatedContentSynced
 3. **Find Similar**: Uses pgvector to find similar content across all configured models
 4. **Store Links**: Stores the related content relationships in the `related_content` table
 5. **Fast Retrieval**: When displaying related content, it's a simple database lookup (no API calls)
+
+### Bidirectional Relationships
+
+Related content works in both directions automatically. When a new BlogPost is saved and finds an Event as related, the Event will also show the BlogPost in its related content - without needing to re-sync the Event.
+
+This is achieved by querying both directions:
+- Forward: where this model is the source
+- Reverse: where this model is the related target
+
+Results are deduplicated and sorted by similarity score.
 
 ## Performance
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Vlados\LaravelRelatedContent\Models;
 
 use Illuminate\Database\Eloquent\Model;

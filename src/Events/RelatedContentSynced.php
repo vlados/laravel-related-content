@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Vlados\LaravelRelatedContent\Events;
 
 use Illuminate\Database\Eloquent\Model;

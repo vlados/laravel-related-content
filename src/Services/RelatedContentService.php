@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Vlados\LaravelRelatedContent\Services;
 
 use Illuminate\Database\Eloquent\Model;
@@ -61,7 +63,7 @@ class RelatedContentService
                 $embedding,
                 $modelClass,
                 $model,
-                ceil($limit / count($modelTypes)),
+                (int) ceil($limit / count($modelTypes)),
                 $threshold
             );
 
@@ -150,9 +152,17 @@ class RelatedContentService
 
     /**
      * Search for content by text query.
+     *
+     * @throws \InvalidArgumentException
      */
     public function search(string $query, array $modelTypes = [], int $limit = 10): Collection
     {
+        $query = trim($query);
+
+        if (empty($query)) {
+            throw new \InvalidArgumentException('Search query cannot be empty');
+        }
+
         $embedding = $this->embeddingService->generate($query);
         $embeddingsTable = config('related-content.tables.embeddings', 'embeddings');
 

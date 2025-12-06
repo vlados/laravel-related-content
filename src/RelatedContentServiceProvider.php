@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Vlados\LaravelRelatedContent;
 
 use Spatie\LaravelPackageTools\Package;

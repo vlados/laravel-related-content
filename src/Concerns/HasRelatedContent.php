@@ -97,33 +97,76 @@ trait HasRelatedContent
 
     /**
      * Get the related models with eager loading.
+     * Queries both directions: where this model is source OR related.
      */
     public function getRelatedModels(?int $limit = null): Collection
     {
         $limit = $limit ?? config('related-content.max_related_items', 10);
 
-        return $this->relatedContent()
-            ->with('related')
-            ->limit($limit)
-            ->get()
-            ->pluck('related')
-            ->filter();
+        // Get models where this is the source
+        /** @var \Illuminate\Database\Eloquent\Collection<int, RelatedContent> $sourceRecords */
+        $sourceRecords = $this->relatedContent()->with('related')->get();
+        $asSource = $sourceRecords->map(fn (RelatedContent $rc) => [
+            'model' => $rc->related,
+            'similarity' => $rc->similarity,
+        ]);
+
+        // Get models where this is the related (reverse direction)
+        /** @var \Illuminate\Database\Eloquent\Collection<int, RelatedContent> $relatedRecords */
+        $relatedRecords = $this->relatedTo()->with('source')->get();
+        $asRelated = $relatedRecords->map(fn (RelatedContent $rc) => [
+            'model' => $rc->source,
+            'similarity' => $rc->similarity,
+        ]);
+
+        // Merge, deduplicate, sort by similarity, and return models
+        return $asSource->concat($asRelated)
+            ->filter(fn ($item) => $item['model'] !== null)
+            ->unique(fn ($item) => get_class($item['model']).':'.$item['model']->getKey())
+            ->sortByDesc('similarity')
+            ->take($limit)
+            ->pluck('model')
+            ->values();
     }
 
     /**
      * Get related models of a specific type.
+     * Queries both directions: where this model is source OR related.
      *
      * @param  class-string  $modelClass
      */
     public function getRelatedOfType(string $modelClass, int $limit = 5): Collection
     {
-        return $this->relatedContent()
+        // Get models where this is the source
+        /** @var \Illuminate\Database\Eloquent\Collection<int, RelatedContent> $sourceRecords */
+        $sourceRecords = $this->relatedContent()
             ->where('related_type', $modelClass)
             ->with('related')
-            ->limit($limit)
-            ->get()
-            ->pluck('related')
-            ->filter();
+            ->get();
+        $asSource = $sourceRecords->map(fn (RelatedContent $rc) => [
+            'model' => $rc->related,
+            'similarity' => $rc->similarity,
+        ]);
+
+        // Get models where this is the related (reverse direction)
+        /** @var \Illuminate\Database\Eloquent\Collection<int, RelatedContent> $relatedRecords */
+        $relatedRecords = $this->relatedTo()
+            ->where('source_type', $modelClass)
+            ->with('source')
+            ->get();
+        $asRelated = $relatedRecords->map(fn (RelatedContent $rc) => [
+            'model' => $rc->source,
+            'similarity' => $rc->similarity,
+        ]);
+
+        // Merge, deduplicate, sort by similarity, and return models
+        return $asSource->concat($asRelated)
+            ->filter(fn ($item) => $item['model'] !== null)
+            ->unique(fn ($item) => $item['model']->getKey())
+            ->sortByDesc('similarity')
+            ->take($limit)
+            ->pluck('model')
+            ->values();
     }
 
     /**

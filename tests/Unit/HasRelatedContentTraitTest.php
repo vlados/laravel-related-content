@@ -138,4 +138,75 @@ describe('HasRelatedContent Trait', function () {
 
         expect($related)->toHaveCount(3);
     });
+
+    it('gets related models from reverse direction', function () {
+        // Scenario: BlogPost synced first, finds Event as related
+        // Event should see BlogPost in its related models (reverse lookup)
+        $event = createTestPost(['title' => 'Event']);
+        $blogPost = createTestPost(['title' => 'Blog Post']);
+
+        // BlogPost -> Event (BlogPost was synced, found Event as related)
+        RelatedContent::create([
+            'source_type' => TestPost::class,
+            'source_id' => $blogPost->id,
+            'related_type' => TestPost::class,
+            'related_id' => $event->id,
+            'similarity' => 0.85,
+        ]);
+
+        // Event should find BlogPost through reverse lookup
+        $eventRelated = $event->getRelatedModels();
+
+        expect($eventRelated)->toHaveCount(1)
+            ->and($eventRelated->first()->id)->toBe($blogPost->id);
+    });
+
+    it('merges both directions without duplicates', function () {
+        $post1 = createTestPost(['title' => 'Post 1']);
+        $post2 = createTestPost(['title' => 'Post 2']);
+
+        // Post1 -> Post2 (forward)
+        RelatedContent::create([
+            'source_type' => TestPost::class,
+            'source_id' => $post1->id,
+            'related_type' => TestPost::class,
+            'related_id' => $post2->id,
+            'similarity' => 0.9,
+        ]);
+
+        // Post2 -> Post1 (reverse, if Post2 was also synced)
+        RelatedContent::create([
+            'source_type' => TestPost::class,
+            'source_id' => $post2->id,
+            'related_type' => TestPost::class,
+            'related_id' => $post1->id,
+            'similarity' => 0.9,
+        ]);
+
+        // Post1 should only see Post2 once (deduplicated)
+        $related = $post1->getRelatedModels();
+
+        expect($related)->toHaveCount(1)
+            ->and($related->first()->id)->toBe($post2->id);
+    });
+
+    it('gets related of type from reverse direction', function () {
+        $event = createTestPost(['title' => 'Event']);
+        $blogPost = createTestPost(['title' => 'Blog Post']);
+
+        // BlogPost -> Event
+        RelatedContent::create([
+            'source_type' => TestPost::class,
+            'source_id' => $blogPost->id,
+            'related_type' => TestPost::class,
+            'related_id' => $event->id,
+            'similarity' => 0.85,
+        ]);
+
+        // Event should find BlogPost of specific type through reverse lookup
+        $eventRelated = $event->getRelatedOfType(TestPost::class);
+
+        expect($eventRelated)->toHaveCount(1)
+            ->and($eventRelated->first()->id)->toBe($blogPost->id);
+    });
 });

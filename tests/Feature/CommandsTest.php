@@ -11,7 +11,41 @@ beforeEach(function () {
 });
 
 describe('GenerateEmbeddingsCommand', function () {
-    it('generates embeddings for all models', function () {
+    it('generates embeddings only for models without embeddings by default', function () {
+        $post1 = createTestPost(['title' => 'First Post']);
+        $post2 = createTestPost(['title' => 'Second Post']);
+
+        // Create embedding for post1 (simulating it already has one)
+        Embedding::create([
+            'embeddable_type' => TestPost::class,
+            'embeddable_id' => $post1->id,
+            'embedding' => json_encode(generateFakeEmbedding(10)),
+            'model' => 'test',
+            'dimensions' => 10,
+        ]);
+
+        $mockProvider = Mockery::mock(EmbeddingProvider::class);
+        $mockProvider->shouldReceive('generate')
+            ->once() // Only called once for post2
+            ->andReturn(new Vector(generateFakeEmbedding(10)));
+        $mockProvider->shouldReceive('model')
+            ->andReturn('text-embedding-3-small');
+        $mockProvider->shouldReceive('dimensions')
+            ->andReturn(10);
+
+        $this->app->instance(EmbeddingProvider::class, $mockProvider);
+
+        $this->artisan('related-content:embeddings', [
+            'model' => TestPost::class,
+        ])
+            ->expectsOutputToContain('missing only')
+            ->expectsOutputToContain('Processed: 1')
+            ->assertExitCode(0);
+
+        expect(Embedding::count())->toBe(2);
+    });
+
+    it('regenerates all embeddings with --force flag', function () {
         $post1 = createTestPost(['title' => 'First Post']);
         $post2 = createTestPost(['title' => 'Second Post']);
 
@@ -27,12 +61,32 @@ describe('GenerateEmbeddingsCommand', function () {
 
         $this->artisan('related-content:embeddings', [
             'model' => TestPost::class,
+            '--force' => true,
         ])
-            ->expectsOutputToContain('Generating embeddings for')
+            ->expectsOutputToContain('force')
             ->expectsOutputToContain('Processed: 2')
             ->assertExitCode(0);
 
         expect(Embedding::count())->toBe(2);
+    });
+
+    it('shows message when no missing embeddings', function () {
+        $post = createTestPost(['title' => 'Test Post']);
+
+        // Create embedding for the post
+        Embedding::create([
+            'embeddable_type' => TestPost::class,
+            'embeddable_id' => $post->id,
+            'embedding' => json_encode(generateFakeEmbedding(10)),
+            'model' => 'test',
+            'dimensions' => 10,
+        ]);
+
+        $this->artisan('related-content:embeddings', [
+            'model' => TestPost::class,
+        ])
+            ->expectsOutputToContain('No missing embeddings')
+            ->assertExitCode(0);
     });
 
     it('fails when model class does not exist', function () {
@@ -68,6 +122,7 @@ describe('GenerateEmbeddingsCommand', function () {
 
         $this->artisan('related-content:embeddings', [
             'model' => TestPost::class,
+            '--force' => true,
             '--chunk' => 2,
         ])->assertExitCode(0);
 
@@ -88,7 +143,7 @@ describe('GenerateEmbeddingsCommand', function () {
 
         $this->app->instance(EmbeddingProvider::class, $mockProvider);
 
-        $this->artisan('related-content:embeddings')
+        $this->artisan('related-content:embeddings', ['--force' => true])
             ->expectsOutputToContain('Processing all configured models')
             ->expectsOutputToContain('Generating embeddings for')
             ->assertExitCode(0);
@@ -122,7 +177,7 @@ describe('GenerateEmbeddingsCommand', function () {
 
         $this->app->instance(EmbeddingProvider::class, $mockProvider);
 
-        $this->artisan('related-content:embeddings')
+        $this->artisan('related-content:embeddings', ['--force' => true])
             ->expectsOutputToContain('does not exist, skipping')
             ->expectsOutputToContain('Processed: 1')
             ->assertExitCode(0);

@@ -132,14 +132,17 @@ $post->relatedContent()->with('related')->get();
 ### Generate embeddings for existing content
 
 ```bash
-# Generate embeddings for all configured models
+# Generate embeddings for models missing them (default)
 php artisan related-content:embeddings
 
-# Generate embeddings for a specific model
+# Generate for a specific model (missing only)
 php artisan related-content:embeddings "App\Models\BlogPost"
 
+# Force regenerate all embeddings
+php artisan related-content:embeddings --force
+
 # With chunk size
-php artisan related-content:embeddings "App\Models\BlogPost" --chunk=50
+php artisan related-content:embeddings --chunk=50
 ```
 
 ### Rebuild related content links

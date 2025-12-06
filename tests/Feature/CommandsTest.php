@@ -73,6 +73,60 @@ describe('GenerateEmbeddingsCommand', function () {
 
         expect(Embedding::count())->toBe(5);
     });
+
+    it('processes all configured models when no model specified', function () {
+        $post1 = createTestPost(['title' => 'First Post']);
+        $post2 = createTestPost(['title' => 'Second Post']);
+
+        $mockProvider = Mockery::mock(EmbeddingProvider::class);
+        $mockProvider->shouldReceive('generate')
+            ->andReturn(new Vector(generateFakeEmbedding(10)));
+        $mockProvider->shouldReceive('model')
+            ->andReturn('text-embedding-3-small');
+        $mockProvider->shouldReceive('dimensions')
+            ->andReturn(10);
+
+        $this->app->instance(EmbeddingProvider::class, $mockProvider);
+
+        $this->artisan('related-content:embeddings')
+            ->expectsOutputToContain('Processing all configured models')
+            ->expectsOutputToContain('Generating embeddings for')
+            ->assertExitCode(0);
+
+        expect(Embedding::count())->toBe(2);
+    });
+
+    it('fails when no model specified and no models configured', function () {
+        config()->set('related-content.models', []);
+
+        $this->artisan('related-content:embeddings')
+            ->expectsOutput('No models configured. Either specify a model or configure related-content.models.')
+            ->assertExitCode(1);
+    });
+
+    it('skips invalid models when processing all', function () {
+        config()->set('related-content.models', [
+            'App\\Models\\NonExistent',
+            TestPost::class,
+        ]);
+
+        createTestPost(['title' => 'Test Post']);
+
+        $mockProvider = Mockery::mock(EmbeddingProvider::class);
+        $mockProvider->shouldReceive('generate')
+            ->andReturn(new Vector(generateFakeEmbedding(10)));
+        $mockProvider->shouldReceive('model')
+            ->andReturn('text-embedding-3-small');
+        $mockProvider->shouldReceive('dimensions')
+            ->andReturn(10);
+
+        $this->app->instance(EmbeddingProvider::class, $mockProvider);
+
+        $this->artisan('related-content:embeddings')
+            ->expectsOutputToContain('does not exist, skipping')
+            ->expectsOutputToContain('Processed: 1')
+            ->assertExitCode(0);
+    });
 });
 
 describe('RebuildRelatedContentCommand', function () {

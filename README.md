@@ -132,6 +132,9 @@ $post->relatedContent()->with('related')->get();
 ### Generate embeddings for existing content
 
 ```bash
+# Generate embeddings for all configured models
+php artisan related-content:embeddings
+
 # Generate embeddings for a specific model
 php artisan related-content:embeddings "App\Models\BlogPost"
 

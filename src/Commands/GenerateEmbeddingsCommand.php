@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Vlados\LaravelRelatedContent\Commands;
 
 use Illuminate\Console\Command;
-use Vlados\LaravelRelatedContent\Models\Embedding;
 use Vlados\LaravelRelatedContent\Services\EmbeddingService;
 
 class GenerateEmbeddingsCommand extends Command
@@ -41,7 +40,7 @@ class GenerateEmbeddingsCommand extends Command
             return self::FAILURE;
         }
 
-        $this->info('Processing all configured models' . ($force ? ' (force mode)' : ' (missing only)') . '...');
+        $this->info('Processing all configured models'.($force ? ' (force mode)' : ' (missing only)').'...');
         $this->newLine();
 
         $hasErrors = false;
@@ -95,12 +94,12 @@ class GenerateEmbeddingsCommand extends Command
         $total = $query->count();
 
         if ($total === 0) {
-            $this->info("No " . ($force ? '' : 'missing ') . "embeddings to generate for {$modelClass}.");
+            $this->info('No '.($force ? '' : 'missing ')."embeddings to generate for {$modelClass}.");
 
             return self::SUCCESS;
         }
 
-        $this->info("Generating embeddings for {$modelClass}" . ($force ? ' (force)' : ' (missing only)') . "...");
+        $this->info("Generating embeddings for {$modelClass}".($force ? ' (force)' : ' (missing only)').'...');
         $this->info("Found {$total} models to process.");
 
         $processed = 0;

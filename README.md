@@ -129,33 +129,23 @@ $post->relatedContent()->with('related')->get();
 
 ## Artisan Commands
 
-### Generate embeddings for existing content
+### Rebuild embeddings and related content
 
 ```bash
-# Generate embeddings for models missing them (default)
-php artisan related-content:embeddings
+# Process models missing embeddings (default behavior)
+php artisan related-content:rebuild
 
-# Generate for a specific model (missing only)
-php artisan related-content:embeddings "App\Models\BlogPost"
-
-# Force regenerate all embeddings
-php artisan related-content:embeddings --force
-
-# With chunk size
-php artisan related-content:embeddings --chunk=50
-```
-
-### Rebuild related content links
-
-```bash
-# Rebuild for a specific model
+# Process a specific model (missing only)
 php artisan related-content:rebuild "App\Models\BlogPost"
 
-# Rebuild for all configured models
-php artisan related-content:rebuild
+# Force regenerate all embeddings
+php artisan related-content:rebuild --force
 
 # Process synchronously (instead of queuing)
 php artisan related-content:rebuild --sync
+
+# With custom chunk size
+php artisan related-content:rebuild --chunk=50
 ```
 
 ## Semantic Search

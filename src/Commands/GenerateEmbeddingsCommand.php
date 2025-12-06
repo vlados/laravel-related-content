@@ -20,13 +20,13 @@ class GenerateEmbeddingsCommand extends Command
         $modelClass = $this->argument('model');
         $chunkSize = (int) $this->option('chunk');
 
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             $this->error("Model class {$modelClass} does not exist.");
 
             return self::FAILURE;
         }
 
-        if (!method_exists($modelClass, 'embeddableFields')) {
+        if (! method_exists($modelClass, 'embeddableFields')) {
             $this->error("Model {$modelClass} must use the HasRelatedContent trait.");
 
             return self::FAILURE;

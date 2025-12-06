@@ -6,7 +6,7 @@ use Vlados\LaravelRelatedContent\Tests\Fixtures\TestPost;
 
 describe('HasRelatedContent Trait', function () {
     it('returns embeddable fields', function () {
-        $post = new TestPost();
+        $post = new TestPost;
 
         expect($post->embeddableFields())->toBe(['title', 'content']);
     });

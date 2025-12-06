@@ -57,7 +57,7 @@ class SyncRelatedContentJob implements ShouldQueue
      */
     public function uniqueId(): string
     {
-        return get_class($this->model) . ':' . $this->model->getKey();
+        return get_class($this->model).':'.$this->model->getKey();
     }
 
     /**

@@ -45,7 +45,7 @@ class OllamaHandler implements EmbeddingProvider
 
         $data = json_decode($response->getBody()->getContents(), true);
 
-        if (!isset($data['embedding'])) {
+        if (! isset($data['embedding'])) {
             throw new RuntimeException('Invalid response from Ollama embeddings API');
         }
 

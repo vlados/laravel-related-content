@@ -24,7 +24,7 @@ class RelatedContentService
         // Step 1: Generate/update embedding
         $embedding = $this->embeddingService->embedModel($model);
 
-        if (!$embedding) {
+        if (! $embedding) {
             return;
         }
 
@@ -42,7 +42,7 @@ class RelatedContentService
     {
         $embedding = $embedding ?? $model->embedding;
 
-        if (!$embedding) {
+        if (! $embedding) {
             return collect();
         }
 
@@ -94,11 +94,11 @@ class RelatedContentService
             ->select([
                 'embeddable_type',
                 'embeddable_id',
-                DB::raw("1 - (embedding <=> ?) as similarity"),
+                DB::raw('1 - (embedding <=> ?) as similarity'),
             ])
             ->addBinding($sourceEmbedding->embedding, 'select')
             ->where('embeddable_type', $modelClass)
-            ->whereRaw("1 - (embedding <=> ?) >= ?", [
+            ->whereRaw('1 - (embedding <=> ?) >= ?', [
                 $sourceEmbedding->embedding,
                 $threshold,
             ]);
@@ -145,7 +145,7 @@ class RelatedContentService
             'updated_at' => now(),
         ])->toArray();
 
-        if (!empty($records)) {
+        if (! empty($records)) {
             RelatedContent::insert($records);
         }
     }
@@ -170,13 +170,13 @@ class RelatedContentService
             ->select([
                 'embeddable_type',
                 'embeddable_id',
-                DB::raw("1 - (embedding <=> ?) as similarity"),
+                DB::raw('1 - (embedding <=> ?) as similarity'),
             ])
             ->addBinding($embedding, 'select')
             ->orderByRaw('embedding <=> ?', [$embedding])
             ->limit($limit);
 
-        if (!empty($modelTypes)) {
+        if (! empty($modelTypes)) {
             $dbQuery->whereIn('embeddable_type', $modelTypes);
         }
 

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Vlados\LaravelRelatedContent\Concerns;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Collection;
 use Vlados\LaravelRelatedContent\Jobs\SyncRelatedContentJob;
 use Vlados\LaravelRelatedContent\Models\Embedding;
 use Vlados\LaravelRelatedContent\Models\RelatedContent;
@@ -57,7 +57,7 @@ trait HasRelatedContent
             // Handle Spatie Translatable
             if (method_exists($this, 'getTranslations')) {
                 $translations = $this->getTranslations($field);
-                if (!empty($translations)) {
+                if (! empty($translations)) {
                     $value = implode("\n", array_filter($translations));
                 }
             }
@@ -98,7 +98,7 @@ trait HasRelatedContent
     /**
      * Get the related models with eager loading.
      */
-    public function getRelatedModels(int $limit = null): Collection
+    public function getRelatedModels(?int $limit = null): Collection
     {
         $limit = $limit ?? config('related-content.max_related_items', 10);
 
@@ -113,7 +113,7 @@ trait HasRelatedContent
     /**
      * Get related models of a specific type.
      *
-     * @param class-string $modelClass
+     * @param  class-string  $modelClass
      */
     public function getRelatedOfType(string $modelClass, int $limit = 5): Collection
     {
@@ -139,7 +139,7 @@ trait HasRelatedContent
         }
 
         // Also sync if there's no embedding yet
-        if (!$this->embedding) {
+        if (! $this->embedding) {
             return true;
         }
 

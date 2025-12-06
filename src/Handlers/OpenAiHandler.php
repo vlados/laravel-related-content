@@ -24,7 +24,7 @@ class OpenAiHandler implements EmbeddingProvider
     public function __construct(array $config)
     {
         $this->apiKey = $config['api_key'] ?? throw new RuntimeException('OpenAI API key is required');
-        $this->baseUrl = rtrim($config['base_url'] ?? 'https://api.openai.com/v1', '/') . '/';
+        $this->baseUrl = rtrim($config['base_url'] ?? 'https://api.openai.com/v1', '/').'/';
         $this->model = $config['model'] ?? 'text-embedding-3-small';
         $this->dimensions = (int) ($config['dimensions'] ?? 1536);
 
@@ -50,7 +50,7 @@ class OpenAiHandler implements EmbeddingProvider
 
         $data = json_decode($response->getBody()->getContents(), true);
 
-        if (!isset($data['data'][0]['embedding'])) {
+        if (! isset($data['data'][0]['embedding'])) {
             throw new RuntimeException('Invalid response from OpenAI embeddings API');
         }
 

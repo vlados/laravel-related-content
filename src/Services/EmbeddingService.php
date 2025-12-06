@@ -28,7 +28,7 @@ class EmbeddingService
      */
     public function embedModel(Model $model): ?Embedding
     {
-        if (!method_exists($model, 'toEmbeddableText')) {
+        if (! method_exists($model, 'toEmbeddableText')) {
             throw new \InvalidArgumentException(
                 'Model must use HasRelatedContent trait or implement toEmbeddableText method'
             );

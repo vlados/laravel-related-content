@@ -34,7 +34,7 @@ class RebuildRelatedContentCommand extends Command
         }
 
         foreach ($modelTypes as $modelClass) {
-            if (!class_exists($modelClass)) {
+            if (! class_exists($modelClass)) {
                 $this->warn("Model class {$modelClass} does not exist, skipping.");
 
                 continue;

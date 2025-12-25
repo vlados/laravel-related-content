@@ -3,6 +3,21 @@
 return [
     /*
     |--------------------------------------------------------------------------
+    | Enable Related Content
+    |--------------------------------------------------------------------------
+    |
+    | When disabled, the package will use a NullHandler that returns zero
+    | vectors. This is useful for testing environments or when you want
+    | to temporarily disable embedding generation.
+    |
+    | The package will also automatically disable itself if the configured
+    | provider is missing required credentials (e.g., OpenAI API key).
+    |
+    */
+    'enabled' => env('RELATED_CONTENT_ENABLED', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Embedding Provider
     |--------------------------------------------------------------------------
     |
